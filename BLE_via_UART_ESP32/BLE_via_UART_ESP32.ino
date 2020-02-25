@@ -9,6 +9,10 @@
 #define DATA_PIN 26
 CRGB leds[NUM_LEDS];
 
+
+#define BRIGHTNESS  255
+#define FRAMES_PER_SECOND  60
+
 BLEServer *pServer = NULL;
 BLECharacteristic * pTxCharacteristic;
 bool deviceConnected = false;
@@ -17,11 +21,11 @@ uint8_t txValue = 0;
 String MSSAGE;
 String HEXCOLOR;
 String Mtype;
-bool POWER;
-int MODE;
-byte R;
-byte G;
-byte B;
+bool POWER = true;
+String MODE = "1";
+byte R = 0;
+byte G = 0;
+byte B = 255;
 
 
 // See the following for generating UUIDs:
@@ -66,7 +70,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
             Serial.println(POWER);
           }
           if (String(rxValue[1]) == "M"){ // Mode Solector
-            MODE = rxValue[2];
+            MODE = String(rxValue[2]);
             Serial.print("Mode is ");
             Serial.println(MODE);
           }
@@ -121,16 +125,16 @@ void setup() {
 
   // Create a BLE Characteristic
   pTxCharacteristic = pService->createCharacteristic(
-										CHARACTERISTIC_UUID_TX,
-										BLECharacteristic::PROPERTY_NOTIFY
-									);
+                    CHARACTERISTIC_UUID_TX,
+                    BLECharacteristic::PROPERTY_NOTIFY
+                  );
                       
   pTxCharacteristic->addDescriptor(new BLE2902());
 
   BLECharacteristic * pRxCharacteristic = pService->createCharacteristic(
-											 CHARACTERISTIC_UUID_RX,
-											BLECharacteristic::PROPERTY_WRITE
-										);
+                       CHARACTERISTIC_UUID_RX,
+                      BLECharacteristic::PROPERTY_WRITE
+                    );
 
   pRxCharacteristic->setCallbacks(new MyCallbacks());
 
@@ -145,19 +149,35 @@ void setup() {
   FastLED.setBrightness(100);
 }
 
+int POS = 0;
+
 void loop() {
   if (deviceConnected) {
+    Serial.print("LED POS:");
+    Serial.println(POWER);
     if (POWER){
-      colorWipe(CRGB(R,G,B), 40);
-      colorWipe(CRGB(0,0,50), 40);
+      if (MODE == "1"){
+        colorFill(CRGB(R,G,B));
+      }
+      if (MODE == "2"){
+        if (POS == NUM_LEDS)POS = 0;
+        leds[POS] = CRGB(R,G,B);        //  Set pixel's color (in RAM)
+        POS++;
+        Serial.print("LED POS:");
+        Serial.println(POS);
+        FadeALL();
+        FastLED.show();                        //  Update strip to match
+        delay(40);                           //  Pause for a moment
+      }
+      //colorWipe(CRGB(R,G,B), 40);
     } else {
-      colorWipe(CRGB(0,0,0), 0);
+      colorFill(CRGB(0,0,0));
     }
     //pTxCharacteristic->setValue(&txValue, 1);
     //pTxCharacteristic->notify();
     //txValue++;
     delay(10); // bluetooth stack will go into congestion, if too many packets are sent
-	}
+  }
   if (MSSAGE == "!CON"){
     Serial.println("Switch ON");
     colorWipe(CRGB::Green, 20); // Green
@@ -177,16 +197,31 @@ void loop() {
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
-	// do stuff here on connecting
+  // do stuff here on connecting
       oldDeviceConnected = deviceConnected;
   }  
+}
+
+
+
+void colorFill(CRGB color) {
+  for(int i=0; i<NUM_LEDS; i++) { // For each pixel in strip...
+    leds[i] = color;        //  Set pixel's color (in RAM)
+  }
+  FastLED.show();                        //  Update strip to match
 }
 
 void colorWipe(CRGB color, int wait) {
   for(int i=0; i<NUM_LEDS; i++) { // For each pixel in strip...
     leds[i] = color;        //  Set pixel's color (in RAM)
+    FadeALL();
     FastLED.show();                        //  Update strip to match
     delay(wait);                           //  Pause for a moment
   }
 }
 
+void FadeALL() {
+  for(int j=0; j<NUM_LEDS; j++) { // For each pixel in strip...
+    leds[j].fadeToBlackBy( 10 ); //  Set pixel's color (in RAM)
+  }
+}
